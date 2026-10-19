@@ -1,0 +1,60 @@
+// Danh sach mau cac hoat dong / so thich (≥ 6 items)
+// Moi item co 'id' duy nhat dang string de lam key cho FlatList
+export const INITIAL_ACTIVITIES = [
+  {
+    id: 'act-1',
+    title: 'Mobile App Development',
+    category: 'Technology',
+    description: 'Building cross-platform mobile apps with React Native & Expo.',
+    icon: '📱',
+    isFavorite: false,
+  },
+  {
+    id: 'act-2',
+    title: 'UI/UX Interaction Design',
+    category: 'Design',
+    description: 'Prototyping responsive layouts and intuitive user journeys.',
+    icon: '🎨',
+    isFavorite: false,
+  },
+  {
+    id: 'act-3',
+    title: 'Swimming & Fitness',
+    category: 'Sports',
+    description: 'Endurance workouts and cardio exercises 3 times a week.',
+    icon: '🏊',
+    isFavorite: false,
+  },
+  {
+    id: 'act-4',
+    title: 'Acoustic Guitar Playing',
+    category: 'Music',
+    description: 'Practicing chord progressions and fingerstyle acoustic songs.',
+    icon: '🎸',
+    isFavorite: false,
+  },
+  {
+    id: 'act-5',
+    title: 'Tech Architecture Reading',
+    category: 'Reading',
+    description: 'Exploring clean architecture and software engineering patterns.',
+    icon: '📚',
+    isFavorite: false,
+  },
+  {
+    id: 'act-6',
+    title: 'Badminton Doubles',
+    category: 'Sports',
+    description: 'Playing tactical weekend matches with university club teammates.',
+    icon: '🏸',
+    isFavorite: false,
+  },
+  {
+    id: 'act-7',
+    title: 'Open Source Contribution',
+    category: 'Technology',
+    description: 'Reviewing PRs and contributing to React community packages.',
+    icon: '💻',
+    isFavorite: false,
+  },
+];
