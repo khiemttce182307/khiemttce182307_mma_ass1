@@ -1,4 +1,6 @@
-import React, { createContext, useState, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext } from 'react';
+import { getItem, setItem } from '../storage/storage';
+import { STORAGE_KEYS } from '../constants/storageKeys';
 
 // 1. Bang mau chuan cho Light va Dark theme
 export const THEMES = {
@@ -34,30 +36,49 @@ export const THEMES = {
   },
 };
 
-// 2. Tao Context
 const ThemeContext = createContext();
 
-// 3. ThemeProvider quan ly state themeMode va cung cap du lieu cho toan app
 export function ThemeProvider({ children }) {
   const [themeMode, setThemeMode] = useState('light');
+  // Loading state de ngan chan hien tuong nhay sai theme (Theme Flash)
+  const [isLoadingTheme, setIsLoadingTheme] = useState(true);
 
-  // Ham chuyen doi qua lai giua 'light' va 'dark'
-  // Su dung functional update (prevMode) de tranh stale state
-  const toggleTheme = () => {
-    setThemeMode((prevMode) => (prevMode === 'light' ? 'dark' : 'light'));
+  // Hydrate: Doc theme da luu tu AsyncStorage khi ung dung khoi dong
+  useEffect(() => {
+    async function hydrateTheme() {
+      try {
+        const savedMode = await getItem(STORAGE_KEYS.THEME, 'light');
+        if (savedMode === 'dark' || savedMode === 'light') {
+          setThemeMode(savedMode);
+        }
+      } catch (error) {
+        console.warn('[ThemeContext] Error during hydration:', error);
+      } finally {
+        setIsLoadingTheme(false);
+      }
+    }
+
+    hydrateTheme();
+  }, []);
+
+  // Chuyen doi theme va luu vao AsyncStorage
+  const toggleTheme = async () => {
+    const nextMode = themeMode === 'light' ? 'dark' : 'light';
+    // 1. Cap nhat state tren RAM ngay lap tuc de UI phan hoi tuc thi
+    setThemeMode(nextMode);
+    // 2. Ghi vao storage bat dong bo co await
+    await setItem(STORAGE_KEYS.THEME, nextMode);
   };
 
-  // Lay bo mau tuong ung voi themeMode hien tai
   const colors = THEMES[themeMode];
 
   return (
-    <ThemeContext.Provider value={{ themeMode, toggleTheme, colors }}>
+    <ThemeContext.Provider value={{ themeMode, toggleTheme, colors, isLoadingTheme }}>
       {children}
     </ThemeContext.Provider>
   );
 }
 
-// 4. Custom hook giup cac component con truy cap theme de dang
 export function useTheme() {
   const context = useContext(ThemeContext);
   if (!context) {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,46 +9,50 @@ import {
 } from 'react-native';
 
 import { INITIAL_ACTIVITIES } from '../constants/activities';
+import { STORAGE_KEYS } from '../constants/storageKeys';
+import { getItem, setItem } from '../storage/storage';
 import { useTheme } from '../context/ThemeContext';
 import ActivityItem from '../components/ActivityItem';
 
-// Danh sach cac danh muc filter
 const CATEGORIES = ['All', 'Favorites', 'Technology', 'Sports', 'Design', 'Music', 'Reading'];
 
 export default function ActivityScreen() {
   const { colors } = useTheme();
 
-  // 1. State danh sach activities (khoi tao tu constants)
+  // 1. State danh sach activities
   const [activities, setActivities] = useState(INITIAL_ACTIVITIES);
-
-  // 2. State filter danh muc
   const [selectedCategory, setSelectedCategory] = useState('All');
 
-  // 3. Ham tuong tac: Toggle trang thai Favorite
-  // KHONG mutate truc tiep mang hoac object, dung .map tao ban sao moi hoan toan
-  const handleToggleFavorite = (id) => {
-    setActivities((prevList) =>
-      prevList.map((item) =>
-        item.id === id ? { ...item, isFavorite: !item.isFavorite } : item
-      )
+  // 2. Hydrate danh sach tu AsyncStorage khi vao man hinh
+  useEffect(() => {
+    async function hydrateActivities() {
+      const savedActivities = await getItem(STORAGE_KEYS.ACTIVITIES, INITIAL_ACTIVITIES);
+      if (Array.isArray(savedActivities)) {
+        setActivities(savedActivities);
+      }
+    }
+    hydrateActivities();
+  }, []);
+
+  // 3. Ham tuong tac: Toggle Favorite & luu AsyncStorage
+  const handleToggleFavorite = async (id) => {
+    const updatedList = activities.map((item) =>
+      item.id === id ? { ...item, isFavorite: !item.isFavorite } : item
     );
+    setActivities(updatedList);
+    await setItem(STORAGE_KEYS.ACTIVITIES, updatedList);
   };
 
   // 4. Loc danh sach theo category dang chon
   const filteredActivities = activities.filter((item) => {
-    if (selectedCategory === 'Favorites') {
-      return item.isFavorite;
-    }
-    if (selectedCategory === 'All') {
-      return true;
-    }
+    if (selectedCategory === 'Favorites') return item.isFavorite;
+    if (selectedCategory === 'All') return true;
     return item.category === selectedCategory;
   });
 
-  // 5. Dem tong so muc yeu thich de hien thi badge
   const favoriteCount = activities.filter((item) => item.isFavorite).length;
 
-  // 6. Giao dien khi danh sach trong (Empty State)
+  // 5. Giao dien khi danh sach trong (Empty State)
   const renderEmptyComponent = () => (
     <View style={[styles.emptyContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <Text style={styles.emptyIcon}>📭</Text>
@@ -61,13 +65,14 @@ export default function ActivityScreen() {
           : `No activities found under the "${selectedCategory}" category.`}
       </Text>
 
-      {/* Nut Reset de tien test khi can phuc hoi du lieu mau */}
+      {/* Nut Reset du lieu mau & cap nhat storage */}
       {activities.length === 0 || selectedCategory !== 'All' ? (
         <TouchableOpacity
           style={[styles.resetButton, { backgroundColor: colors.primary }]}
-          onPress={() => {
+          onPress={async () => {
             setActivities(INITIAL_ACTIVITIES);
             setSelectedCategory('All');
+            await setItem(STORAGE_KEYS.ACTIVITIES, INITIAL_ACTIVITIES);
           }}
         >
           <Text style={[styles.resetButtonText, { color: colors.primaryText }]}>Reset All Activities</Text>
@@ -78,7 +83,7 @@ export default function ActivityScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header thong ke va nut Clear All de giang vien test Empty State */}
+      {/* Header thong ke & Nut Clear List */}
       <View style={styles.statsRow}>
         <Text style={[styles.statsText, { color: colors.text }]}>
           Showing <Text style={{ color: colors.primary, fontWeight: 'bold' }}>{filteredActivities.length}</Text> / {activities.length} activities
@@ -89,7 +94,10 @@ export default function ActivityScreen() {
           </Text>
           {activities.length > 0 && (
             <TouchableOpacity
-              onPress={() => setActivities([])}
+              onPress={async () => {
+                setActivities([]);
+                await setItem(STORAGE_KEYS.ACTIVITIES, []);
+              }}
               style={[styles.clearBtn, { borderColor: colors.danger }]}
             >
               <Text style={{ color: colors.danger, fontSize: 12, fontWeight: '600' }}>Clear List</Text>
@@ -98,13 +106,9 @@ export default function ActivityScreen() {
         </View>
       </View>
 
-      {/* Thanh cuon ngang chon Category Filter */}
+      {/* Filter Tabs */}
       <View style={styles.filterSection}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterList}
-        >
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterList}>
           {CATEGORIES.map((category) => {
             const isSelected = selectedCategory === category;
             return (
@@ -119,12 +123,7 @@ export default function ActivityScreen() {
                 ]}
                 onPress={() => setSelectedCategory(category)}
               >
-                <Text
-                  style={[
-                    styles.filterChipText,
-                    { color: isSelected ? colors.primaryText : colors.text },
-                  ]}
-                >
+                <Text style={[styles.filterChipText, { color: isSelected ? colors.primaryText : colors.text }]}>
                   {category}
                   {category === 'Favorites' ? ` (${favoriteCount})` : ''}
                 </Text>
@@ -134,10 +133,9 @@ export default function ActivityScreen() {
         </ScrollView>
       </View>
 
-      {/* FlatList chinh hien thi danh sach */}
+      {/* FlatList */}
       <FlatList
         data={filteredActivities}
-        // keyExtractor dung id duy nhat dang string
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <ActivityItem item={item} onToggleFavorite={handleToggleFavorite} />
@@ -153,90 +151,22 @@ export default function ActivityScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
-  statsText: {
-    fontSize: 14,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  favoriteCounter: {
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  clearBtn: {
-    borderWidth: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  filterSection: {
-    paddingVertical: 8,
-  },
-  filterList: {
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-  filterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  filterChipText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  listContent: {
-    padding: 16,
-    paddingBottom: 24,
-  },
-  listContentEmpty: {
-    flexGrow: 1,
-    justifyContent: 'center',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 28,
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: 10,
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 4,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  emptyDescription: {
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
-    paddingHorizontal: 10,
-  },
-  resetButton: {
-    marginTop: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  resetButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
+  container: { flex: 1 },
+  statsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
+  statsText: { fontSize: 14 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  favoriteCounter: { fontSize: 14, fontWeight: 'bold' },
+  clearBtn: { borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  filterSection: { paddingVertical: 8 },
+  filterList: { paddingHorizontal: 16, gap: 8 },
+  filterChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
+  filterChipText: { fontSize: 13, fontWeight: '600' },
+  listContent: { padding: 16, paddingBottom: 24 },
+  listContentEmpty: { flexGrow: 1, justifyContent: 'center' },
+  emptyContainer: { alignItems: 'center', justifyContent: 'center', padding: 28, borderRadius: 16, borderWidth: 1, gap: 10 },
+  emptyIcon: { fontSize: 48, marginBottom: 4 },
+  emptyTitle: { fontSize: 18, fontWeight: 'bold' },
+  emptyDescription: { fontSize: 14, textAlign: 'center', lineHeight: 20, paddingHorizontal: 10 },
+  resetButton: { marginTop: 12, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 },
+  resetButtonText: { fontSize: 14, fontWeight: '600' },
 });

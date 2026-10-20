@@ -1,30 +1,62 @@
-import React, { createContext, useState, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext } from 'react';
 import { DEFAULT_PROFILE } from '../constants/defaultProfile';
+import { getItem, setItem } from '../storage/storage';
+import { STORAGE_KEYS } from '../constants/storageKeys';
 
-// 1. Tao ProfileContext
 const ProfileContext = createContext();
 
-// 2. ProfileProvider quan ly state profile va cung cap ham cap nhat
 export function ProfileProvider({ children }) {
-  // Khoi tao state profile tu default an toan
   const [profile, setProfile] = useState(DEFAULT_PROFILE);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
 
-  // Ham cap nhat profile: KHONG mutate truc tiep ma dung spread operator tao object moi
-  const updateProfile = (updatedFields) => {
-    setProfile((prevProfile) => ({
-      ...prevProfile,
+  // Hydrate: Doc du lieu profile tu AsyncStorage khi khoi dong app
+  useEffect(() => {
+    async function hydrateProfile() {
+      try {
+        const savedProfile = await getItem(STORAGE_KEYS.PROFILE, DEFAULT_PROFILE);
+        // Fallback an toan: Dam bao profile co day du cac truong co ban
+        if (savedProfile && typeof savedProfile === 'object') {
+          setProfile({
+            ...DEFAULT_PROFILE,
+            ...savedProfile,
+          });
+        }
+      } catch (error) {
+        console.warn('[ProfileContext] Error during hydration:', error);
+      } finally {
+        setIsLoadingProfile(false);
+      }
+    }
+
+    hydrateProfile();
+  }, []);
+
+  // Cap nhat profile khong mutate va luu vao AsyncStorage
+  const updateProfile = async (updatedFields) => {
+    const nextProfile = {
+      ...profile,
       ...updatedFields,
-    }));
+    };
+    // 1. Cap nhat state de UI re-render tuc thi
+    setProfile(nextProfile);
+    // 2. Persist xuong storage bat dong bo co await
+    await setItem(STORAGE_KEYS.PROFILE, nextProfile);
   };
 
   return (
-    <ProfileContext.Provider value={{ profile, updateProfile, defaultProfile: DEFAULT_PROFILE }}>
+    <ProfileContext.Provider
+      value={{
+        profile,
+        updateProfile,
+        defaultProfile: DEFAULT_PROFILE,
+        isLoadingProfile,
+      }}
+    >
       {children}
     </ProfileContext.Provider>
   );
 }
 
-// 3. Custom hook de cac screen doc/ghi profile de dang
 export function useProfile() {
   const context = useContext(ProfileContext);
   if (!context) {
